@@ -8,5 +8,5 @@ Copy this code any html file and run.
 # How to play
 This game is played using the arrow keys.
 Up arrow key rotates the tetrominos.
-left and right keys are movement keys.
-down arrow key is accelerator.
+Left and right keys are movement keys.
+Down arrow key is accelerator.
