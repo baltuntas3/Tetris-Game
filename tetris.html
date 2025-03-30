@@ -1,236 +1,737 @@
 <!DOCTYPE html>
 <html>
-<body>
-<p id="demo"></p>
-<center><canvas id="tetris" width="240" height="400" style="border:1px solid #000000;">
-</canvas></center>
-<script>
-function rotate(px, py, r)
-{
-	
-	var pi = 0;
-	switch (r % 4)
-	{
-	case 0: // 0 degrees			// 0  1  2  3
-		pi = py * 4 + px;			// 4  5  6  7
-		break;						// 8  9 10 11
-									//12 13 14 15
-
-	case 1: // 90 degrees			//12  8  4  0
-		pi = 12 + py - (px * 4);	//13  9  5  1
-		break;						//14 10  6  2
-									//15 11  7  3
-
-	case 2: // 180 degrees			//15 14 13 12
-		pi = 15 - (py * 4) - px;	//11 10  9  8
-		break;						// 7  6  5  4
-									// 3  2  1  0
-
-	case 3: // 270 degrees			// 3  7 11 15
-		pi = 3 - py + (px * 4);		// 2  6 10 14
-		break;						// 1  5  9 13
-	}								// 0  4  8 12
-
-	return pi;
-}
-function playerRotateCollide(){
-let offset=1;
-let pos=player.position.x;
-let counter=0;
-  while(collide(arena,player)){
-    player.position.x+=offset;
-      if(player.position.x ==12)
-        offset=-1;
-      else if(player.position.x ==0){
-        offset=1;
-      }
-      if(offset > 4){
-        player.position.x=pos;
-        return;
+  <head>
+    <title>Tetris</title>
+    <style>
+      body {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+        background-color: #f0f0f0;
+        font-family: Arial, sans-serif;
       }
 
-}
+      #game-container {
+        text-align: center;
+        position: relative;
+      }
 
-}
-const canvas = document.getElementById('tetris');
-const context = canvas.getContext('2d');
-context.scale(20,20);
-const arena= matrixArena(12,20);
-var pi=0;
-var tetromino = [[0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0],[0,0,2,0,0,2,2,0,0,0,2,0,0,0,0,0],[0,0,0,0,0,3,3,0,0,3,3,0,0,0,0,0],[0,0,4,0,0,4,4,0,0,4,0,0,0,0,0,0],[0,5,0,0,0,5,5,0,0,0,5,0,0,0,0,0],[0,6,0,0,0,6,0,0,0,6,6,0,0,0,0,0],[0,0,7,0,0,0,7,0,0,7,7,0,0,0,0,0]];
-let dropCounter=0;
-let lastTime=0;
-const colors = [
-  null,
-  'purple',
-  'yellow',
-  'orange',
-  'blue',
-  'aqua',
-  'green',
-  'red'
-];
+      #tetris {
+        border: 1px solid #000000;
+        background-color: #000;
+      }
 
-function arenaSweep(){
-	let counter = 0;
-	
-	outer :for(var y=19;y>=0;y--){
-		for(var x=0;x<12;x++){
-			if(arena[y][x] ===0){
-				continue outer;
-			}
-		}
-		const row = arena.splice(y,1)[0].fill(0);
-					arena.unshift(row);
-					
-		++y;
-		
-	}
-	
+      #score {
+        margin-top: 10px;
+        font-size: 18px;
+      }
 
-}
-function drawMatrix(tetromino,offset){
-	for(var y=0;y<4;y++){
-		for(var x=0;x<4;x++){
-			pi=rotate(x,y,player.rotation.r);
-			if(tetromino[player.rnd][pi]!==0){
-				context.fillStyle=colors[tetromino[player.rnd][pi]];
-				context.fillRect(x+offset.x,y+offset.y,1,1);
-			}
-			
-		}
-	}
-}
-function drawArena(arena,offset){
+      .screen {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+      }
 
-	for(var y=0;y<20;y++){
-		for(var x=0;x<12;x++){
-			if(arena[y][x]!==0){
-				context.fillStyle=colors[arena[y][x]];
-				context.fillRect(x+offset.x,y+offset.y,1,1);
-			}
-			
-		}
-	}
-}
-function draw(){
-context.fillStyle='#000';
-context.fillRect(0,0,canvas.width,canvas.height);
-	drawArena(arena,{x:0,y:0});
-	drawMatrix(player.matrix,player.position);
-}
+      .hidden {
+        display: none;
+      }
 
+      .btn {
+        background: #4caf50;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        margin: 5px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+      }
 
+      .btn:hover {
+        background: #45a049;
+      }
 
+      #home-screen {
+        z-index: 10;
+      }
 
+      #game-over-screen {
+        z-index: 20;
+      }
 
-function matrixArena(w,h){
-	const matrix= [];
-	for(var i=0;i<h;i++){
-		matrix.push(new Array(w).fill(0));
-	}
-	return matrix;
-}
+      .score-table {
+        width: 80%;
+        margin: 20px 0;
+        border-collapse: collapse;
+      }
 
-function merge(arena,player){
-	for(var y=0;y<4;y++){
-			for(var x=0;x<4;x++){
-			pi=rotate(x,y,player.rotation.r);
-				if(tetromino[player.rnd][pi]!==0){
-					arena[y+player.position.y][x+player.position.x]=tetromino[player.rnd][pi];
-				}
-				
-			}
-		}
-}
+      .score-table th,
+      .score-table td {
+        padding: 8px;
+        text-align: center;
+        border-bottom: 1px solid #ddd;
+      }
 
+      .score-table th {
+        background-color: #4caf50;
+        color: white;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="game-container">
+      <canvas
+        id="tetris"
+        width="240"
+        height="400"></canvas>
+      <div id="score">Score: 0</div>
 
-function update(time=0){
-	const deltaTime=time-lastTime;
-	lastTime=time;
-	dropCounter+=deltaTime;
-		if(dropCounter>1000)
-		{
-			playerDrop();
-		}
-	draw();
-	requestAnimationFrame(update);
-}
+      <!-- Home Menu Screen -->
+      <div
+        id="home-screen"
+        class="screen">
+        <h1>TETRIS GAME</h1>
+        <div id="best-scores-home">
+          <h2>High Scores</h2>
+          <table
+            class="score-table"
+            id="score-table-home">
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Score</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Scores will be added with JavaScript -->
+            </tbody>
+          </table>
+        </div>
+        <button
+          class="btn"
+          id="play-button">
+          PLAY
+        </button>
+      </div>
 
-function collide(arena,player){
-	const matrix=player.matrix;
-	const pos=player.position;
-	
-	for(var y=0;y<4;y++){
-			for(var x=0;x<4;x++){
-			pi=rotate(x,y,player.rotation.r);
-				if(tetromino[player.rnd][pi]!==0 && (arena[y+pos.y] && arena[y+pos.y][x+pos.x]) !==0){
-					
-					return true;
-				}
-				
-			}
-		}
-	return false;
-}
+      <!-- Game Over Screen -->
+      <div
+        id="game-over-screen"
+        class="screen hidden">
+        <h1>GAME OVER!</h1>
+        <h2 id="final-score">Your Score: 0</h2>
+        <div id="best-scores-end">
+          <h2>High Scores</h2>
+          <table
+            class="score-table"
+            id="score-table-end">
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Score</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Scores will be added with JavaScript -->
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <button
+            class="btn"
+            id="play-again-button">
+            PLAY AGAIN
+          </button>
+          <button
+            class="btn"
+            id="home-button">
+            MAIN MENU
+          </button>
+        </div>
+      </div>
+    </div>
 
+    <script>
+      // Using Module Pattern to limit scope
+      const TetrisGame = (function () {
+        // Constants
+        const COLS = 12;
+        const ROWS = 20;
+        const BLOCK_SIZE = 20;
+        const TETROMINO_SIZE = 4;
+        const COLORS = [
+          null,
+          "purple", // I
+          "yellow", // O
+          "orange", // L
+          "blue", // J
+          "aqua", // T
+          "green", // S
+          "red", // Z
+        ];
 
-const player = {
-	position: {x:0,y:0},
-	matrix : tetromino,
-	rotation : {r:0},
-	rnd : Math.floor(Math.random() * 6)
-}
+        // Pre-calculated rotation matrices
+        const ROTATIONS = [
+          // 0 degrees
+          [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+          // 90 degrees
+          [12, 8, 4, 0, 13, 9, 5, 1, 14, 10, 6, 2, 15, 11, 7, 3],
+          // 180 degrees
+          [15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0],
+          // 270 degrees
+          [3, 7, 11, 15, 2, 6, 10, 14, 1, 5, 9, 13, 0, 4, 8, 12],
+        ];
 
-function playerDrop(){
-	player.position.y+=1;
-	if(collide(arena,player))
-	{
-		player.position.y--;
-		merge(arena,player);
-		player.rnd=Math.floor(Math.random() * 6);
-		player.position.y=0;
-		player.position.x=6;
-		if(collide(arena,player))
-		{
-			arena.forEach(row => row.fill(0));
-		}
-		arenaSweep();
-	}
-	dropCounter=0;
-}
-document.addEventListener("keydown",event =>{
-	if(event.keyCode==39){
-		playerMove(1);
-		
-	}else if(event.keyCode==37){
-		playerMove(-1);
-		
-	}
-	else if(event.keyCode==40){
-		playerDrop();
-	}
-	else{
-		player.rotation.r++;
-		playerRotateCollide();
-	}
+        const DOM = {
+          canvas: document.getElementById("tetris"),
+          scoreDisplay: document.getElementById("score"),
+          finalScore: document.getElementById("final-score"),
+          homeScreen: document.getElementById("home-screen"),
+          gameOverScreen: document.getElementById("game-over-screen"),
+          homeTable: document.getElementById("score-table-home").getElementsByTagName("tbody")[0],
+          endTable: document.getElementById("score-table-end").getElementsByTagName("tbody")[0],
+          playButton: document.getElementById("play-button"),
+          playAgainButton: document.getElementById("play-again-button"),
+          homeButton: document.getElementById("home-button"),
+        };
 
-});
+        // Score Manager
+        const ScoreManager = {
+          scores: [],
+          maxScores: 5,
 
-function playerMove(dir){
-	player.position.x += dir;
-	if(collide(arena,player)){
-		player.position.x -= dir;
-	}
-}
-update();
+          init() {
+            const savedScores = localStorage.getItem("tetrisScores");
+            if (savedScores) {
+              this.scores = JSON.parse(savedScores);
+            }
+          },
 
+          saveScore(score) {
+            const now = new Date();
+            const dateStr = `${now.getDate()}.${now.getMonth() + 1}.${now.getFullYear()}`;
 
+            this.scores.push({
+              score: score,
+              date: dateStr,
+            });
 
+            // Sort scores and keep top 5
+            this.scores.sort((a, b) => b.score - a.score);
+            if (this.scores.length > this.maxScores) {
+              this.scores = this.scores.slice(0, this.maxScores);
+            }
 
+            // Save scores to localStorage
+            localStorage.setItem("tetrisScores", JSON.stringify(this.scores));
 
+            return this.scores;
+          },
 
-</script>
+          getScores() {
+            return this.scores;
+          },
 
-</body>
+          updateScoreTables() {
+            const homeFragment = document.createDocumentFragment();
+            const endFragment = document.createDocumentFragment();
+
+            // Clear existing rows
+            DOM.homeTable.innerHTML = "";
+            DOM.endTable.innerHTML = "";
+
+            this.scores.forEach((scoreData, index) => {
+              // Main menu table row
+              const homeRow = document.createElement("tr");
+
+              // Rank
+              const rankCell = document.createElement("td");
+              rankCell.textContent = index + 1;
+              homeRow.appendChild(rankCell);
+
+              // Score
+              const scoreCell = document.createElement("td");
+              scoreCell.textContent = scoreData.score;
+              homeRow.appendChild(scoreCell);
+
+              // Date
+              const dateCell = document.createElement("td");
+              dateCell.textContent = scoreData.date;
+              homeRow.appendChild(dateCell);
+
+              homeFragment.appendChild(homeRow);
+
+              const endRow = homeRow.cloneNode(true);
+              endFragment.appendChild(endRow);
+            });
+
+            // Add all rows at once
+            DOM.homeTable.appendChild(homeFragment);
+            DOM.endTable.appendChild(endFragment);
+          },
+        };
+
+        // Screen Manager
+        const ScreenManager = {
+          showHomeScreen() {
+            DOM.gameOverScreen.classList.add("hidden");
+            DOM.homeScreen.classList.remove("hidden");
+            ScoreManager.updateScoreTables();
+          },
+
+          hideHomeScreen() {
+            DOM.homeScreen.classList.add("hidden");
+          },
+
+          showGameOverScreen(score) {
+            DOM.finalScore.textContent = `Your Score: ${score}`;
+            DOM.gameOverScreen.classList.remove("hidden");
+            ScoreManager.updateScoreTables();
+          },
+
+          updateScore(score) {
+            DOM.scoreDisplay.textContent = `Score: ${score}`;
+          },
+        };
+
+        // Tetromino Factory
+        const TetrominoFactory = {
+          shapes: [
+            // I
+            [0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0],
+            // O
+            [0, 0, 0, 0, 0, 2, 2, 0, 0, 2, 2, 0, 0, 0, 0, 0],
+            // L
+            [0, 0, 3, 0, 0, 0, 3, 0, 0, 0, 3, 3, 0, 0, 0, 0],
+            // J
+            [0, 4, 0, 0, 0, 4, 0, 0, 0, 4, 4, 0, 0, 0, 0, 0],
+            // T
+            [0, 0, 5, 0, 0, 5, 5, 5, 0, 0, 0, 0, 0, 0, 0, 0],
+            // S
+            [0, 0, 0, 0, 0, 0, 6, 6, 0, 6, 6, 0, 0, 0, 0, 0],
+            // Z
+            [0, 0, 0, 0, 0, 7, 7, 0, 0, 0, 7, 7, 0, 0, 0, 0],
+          ],
+
+          // Cached array length
+          shapeCount: 0,
+
+          init() {
+            // Do calculation once
+            this.shapeCount = this.shapes.length;
+          },
+
+          create() {
+            // Faster random number generation (using bitwise operator)
+            const randomIndex = (Math.random() * this.shapeCount) | 0;
+            return this.shapes[randomIndex];
+          },
+        };
+
+        // Helper Functions
+        function createMatrix(width, height) {
+          const matrix = new Array(height);
+          for (let i = 0; i < height; i++) {
+            matrix[i] = new Array(width).fill(0);
+          }
+          return matrix;
+        }
+
+        // Game State
+        class GameState {
+          constructor() {
+            this.arena = createMatrix(COLS, ROWS);
+            this.player = {
+              position: {x: 0, y: 0},
+              shape: null,
+              rotation: 0,
+              score: 0,
+            };
+            this.dropCounter = 0;
+            this.dropInterval = 1000; // 1 second
+            this.lastTime = 0;
+            this.gameOver = false;
+            this.isPlaying = false;
+
+            // Reusable empty row (for performance)
+            this.emptyRow = new Array(COLS).fill(0);
+
+            this.reset();
+          }
+
+          reset() {
+            this.player.shape = TetrominoFactory.create();
+            this.player.rotation = 0;
+            this.player.position.y = 0;
+            this.player.position.x = Math.floor(COLS / 2) - 2; // Center
+          }
+
+          collide() {
+            const {shape, position, rotation} = this.player;
+            // Use pre-calculated rotation matrices
+            const rotationMatrix = ROTATIONS[rotation % 4];
+
+            for (let y = 0; y < TETROMINO_SIZE; y++) {
+              for (let x = 0; x < TETROMINO_SIZE; x++) {
+                const index = rotationMatrix[y * TETROMINO_SIZE + x];
+
+                if (shape[index] !== 0) {
+                  const arenaX = x + position.x;
+                  const arenaY = y + position.y;
+
+                  // Boundary and collision check
+                  if (arenaX < 0 || arenaX >= COLS || arenaY >= ROWS || (arenaY >= 0 && this.arena[arenaY][arenaX] !== 0)) {
+                    return true;
+                  }
+                }
+              }
+            }
+
+            return false;
+          }
+
+          merge() {
+            const {shape, position, rotation} = this.player;
+            // Use pre-calculated rotation matrices
+            const rotationMatrix = ROTATIONS[rotation % 4];
+
+            for (let y = 0; y < TETROMINO_SIZE; y++) {
+              for (let x = 0; x < TETROMINO_SIZE; x++) {
+                const index = rotationMatrix[y * TETROMINO_SIZE + x];
+
+                if (shape[index] !== 0) {
+                  const arenaY = y + position.y;
+                  const arenaX = x + position.x;
+
+                  if (arenaY >= 0 && arenaX >= 0 && arenaY < ROWS && arenaX < COLS) {
+                    this.arena[arenaY][arenaX] = shape[index];
+                  }
+                }
+              }
+            }
+          }
+
+          sweep() {
+            let linesCleared = 0;
+            let y = ROWS - 1;
+            let rowFilled;
+
+            // Optimized row checking and removal
+            while (y >= 0) {
+              rowFilled = true;
+
+              for (let x = 0; x < COLS; x++) {
+                if (this.arena[y][x] === 0) {
+                  rowFilled = false;
+                  break;
+                }
+              }
+
+              if (rowFilled) {
+                // Remove this row and add empty row at top
+                this.arena.splice(y, 1);
+                // Use pre-prepared empty row (copy)
+                this.arena.unshift([...this.emptyRow]);
+
+                linesCleared++;
+              } else {
+                y--;
+              }
+            }
+
+            // Calculate score
+            if (linesCleared > 0) {
+              // More lines = more points (quadratic scoring)
+              this.player.score += linesCleared * linesCleared * 100;
+              ScreenManager.updateScore(this.player.score);
+
+              // Increase game speed based on score
+              this.dropInterval = Math.max(100, 1000 - Math.floor(this.player.score / 1000) * 100);
+            }
+          }
+
+          // Player movements
+          movePlayer(direction) {
+            this.player.position.x += direction;
+
+            if (this.collide()) {
+              this.player.position.x -= direction;
+            }
+          }
+
+          rotatePlayer() {
+            const originalRotation = this.player.rotation;
+            this.player.rotation = (this.player.rotation + 1) % 4;
+
+            // More efficient wall kick algorithm
+            if (this.collide()) {
+              // Try moving left
+              this.player.position.x -= 1;
+              if (this.collide()) {
+                // Try moving right
+                this.player.position.x += 2;
+                if (this.collide()) {
+                  // Try moving up (for I piece)
+                  this.player.position.y -= 1;
+                  if (this.collide()) {
+                    // If all attempts fail, revert rotation
+                    this.player.position.y += 1;
+                    this.player.position.x -= 1;
+                    this.player.rotation = originalRotation;
+                  }
+                }
+              }
+            }
+          }
+
+          dropPlayer() {
+            this.player.position.y++;
+
+            if (this.collide()) {
+              this.player.position.y--;
+              this.merge();
+              this.sweep();
+              this.reset();
+
+              // Game over check
+              if (this.collide()) {
+                this.gameOver = true;
+                this.isPlaying = false;
+
+                // Save score and show game over screen
+                ScoreManager.saveScore(this.player.score);
+                ScreenManager.showGameOverScreen(this.player.score);
+
+                // Clear game area (more efficient)
+                for (let i = 0; i < ROWS; i++) {
+                  this.arena[i].fill(0);
+                }
+              }
+            }
+
+            this.dropCounter = 0;
+          }
+
+          startNewGame() {
+            // Faster clearing
+            for (let i = 0; i < ROWS; i++) {
+              this.arena[i].fill(0);
+            }
+
+            this.player.score = 0;
+            ScreenManager.updateScore(this.player.score);
+            this.gameOver = false;
+            this.isPlaying = true;
+            this.dropInterval = 1000; // Reset speed
+            this.reset();
+          }
+        }
+
+        // View Manager - View part of MVC
+        class Renderer {
+          constructor(canvas) {
+            this.canvas = canvas;
+            this.context = canvas.getContext("2d");
+            this.context.scale(BLOCK_SIZE, BLOCK_SIZE);
+
+            // Pre-calculate canvas dimensions in blocks
+            this.width = canvas.width / BLOCK_SIZE;
+            this.height = canvas.height / BLOCK_SIZE;
+          }
+
+          clear() {
+            this.context.fillStyle = "#000";
+            this.context.fillRect(0, 0, this.width, this.height);
+          }
+
+          drawMatrix(matrix, offset) {
+            // Optimization by drawing only filled cells
+            for (let y = 0; y < ROWS; y++) {
+              for (let x = 0; x < COLS; x++) {
+                const value = matrix[y][x];
+                if (value !== 0) {
+                  this.context.fillStyle = COLORS[value];
+                  this.context.fillRect(x + offset.x, y + offset.y, 1, 1);
+                }
+              }
+            }
+          }
+
+          drawPlayer(player) {
+            const {shape, position, rotation} = player;
+            // Use pre-calculated rotation matrices
+            const rotationMatrix = ROTATIONS[rotation % 4];
+
+            for (let y = 0; y < TETROMINO_SIZE; y++) {
+              for (let x = 0; x < TETROMINO_SIZE; x++) {
+                const index = rotationMatrix[y * TETROMINO_SIZE + x];
+                const value = shape[index];
+
+                if (value !== 0) {
+                  this.context.fillStyle = COLORS[value];
+                  this.context.fillRect(x + position.x, y + position.y, 1, 1);
+                }
+              }
+            }
+          }
+
+          render(gameState) {
+            // Clear entire canvas
+            this.clear();
+
+            // Draw arena and player
+            this.drawMatrix(gameState.arena, {x: 0, y: 0});
+            this.drawPlayer(gameState.player);
+          }
+        }
+
+        // Controller - Controller part of MVC
+        class Controller {
+          constructor(gameState) {
+            this.gameState = gameState;
+            // More efficient key management
+            this.keyHandlers = {
+              37: () => this.gameState.movePlayer(-1), // Left arrow
+              39: () => this.gameState.movePlayer(1), // Right arrow
+              40: () => this.gameState.dropPlayer(), // Down arrow
+              38: () => this.gameState.rotatePlayer(), // Up arrow
+              32: () => this.gameState.rotatePlayer(), // Space
+            };
+
+            this.bindKeys();
+          }
+
+          bindKeys() {
+            // Better event management
+            this.handleKeydown = (event) => {
+              if (!this.gameState.isPlaying) return;
+
+              const handler = this.keyHandlers[event.keyCode];
+              if (handler) {
+                event.preventDefault();
+                handler();
+              }
+            };
+
+            document.addEventListener("keydown", this.handleKeydown);
+          }
+
+          unbindKeys() {
+            // Clean up event listener
+            document.removeEventListener("keydown", this.handleKeydown);
+          }
+        }
+
+        // Game Manager
+        class GameManager {
+          constructor() {
+            this.gameState = new GameState();
+            this.renderer = new Renderer(DOM.canvas);
+            this.controller = new Controller(this.gameState);
+            this.animationFrameId = null;
+          }
+
+          init() {
+            // Initialize Tetromino factory
+            TetrominoFactory.init();
+
+            // Initialize Score manager
+            ScoreManager.init();
+
+            // Bind button events
+            DOM.playButton.addEventListener("click", () => {
+              ScreenManager.hideHomeScreen();
+              this.gameState.startNewGame();
+              this.startGameLoop();
+            });
+
+            DOM.playAgainButton.addEventListener("click", () => {
+              DOM.gameOverScreen.classList.add("hidden");
+              this.gameState.startNewGame();
+              this.startGameLoop();
+            });
+
+            DOM.homeButton.addEventListener("click", () => {
+              ScreenManager.showHomeScreen();
+            });
+
+            // Update scores
+            ScoreManager.updateScoreTables();
+          }
+
+          startGameLoop() {
+            // Cancel current animation frame
+            if (this.animationFrameId) {
+              cancelAnimationFrame(this.animationFrameId);
+            }
+
+            // Start game loop
+            this.update();
+          }
+
+          update(time = 0) {
+            if (!this.gameState.isPlaying) return;
+
+            const deltaTime = time - this.gameState.lastTime;
+            this.gameState.lastTime = time;
+            this.gameState.dropCounter += deltaTime;
+
+            if (this.gameState.dropCounter > this.gameState.dropInterval) {
+              this.gameState.dropPlayer();
+            }
+
+            // Draw game state
+            this.renderer.render(this.gameState);
+
+            // Continue game loop
+            this.animationFrameId = requestAnimationFrame(this.update.bind(this));
+          }
+
+          cleanup() {
+            // Clean up event listeners and cancel animation frame
+            this.controller.unbindKeys();
+            if (this.animationFrameId) {
+              cancelAnimationFrame(this.animationFrameId);
+            }
+          }
+        }
+
+        // Public API
+        return {
+          init: function () {
+            const gameManager = new GameManager();
+            gameManager.init();
+
+            // Return cleanup function
+            return function cleanup() {
+              gameManager.cleanup();
+            };
+          },
+        };
+      })();
+
+      // Start the game
+      let cleanup;
+      document.addEventListener("DOMContentLoaded", () => {
+        cleanup = TetrisGame.init();
+      });
+
+      // Clean up when page closes
+      window.addEventListener("beforeunload", () => {
+        if (cleanup) cleanup();
+      });
+    </script>
+  </body>
 </html>
